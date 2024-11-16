@@ -101,8 +101,8 @@ def run(rank, n_gpus, hps):
 
   if hps.train.load_pretrained:
     print("load pretrained...")
-    _, _, _, epoch_str = utils.load_checkpoint(f"{hps.model_dir}/G_0.pth", net_g, optim_g)
-    _, _, _, epoch_str = utils.load_checkpoint(f"{hps.model_dir}/D_0.pth", net_d, optim_d)
+    _, _, _, epoch_str = utils.load_checkpoint(f"{hps.model_dir}/G_0.pth", net_g, None)
+    _, _, _, epoch_str = utils.load_checkpoint(f"{hps.model_dir}/D_0.pth", net_d, None)
     epoch_str = 1
     global_step = 0
   else:
