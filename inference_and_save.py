@@ -7,7 +7,6 @@ from utils import get_hparams_from_file, load_filepaths_and_text
 from models import SynthesizerTrn
 from text import text_to_sequence
 
-# Fungsi untuk memuat model
 def load_model(checkpoint_path, config_path):
     hps = get_hparams_from_file(config_path)
     net_g = SynthesizerTrn(
@@ -19,7 +18,6 @@ def load_model(checkpoint_path, config_path):
     utils.load_checkpoint(checkpoint_path, net_g, None)
     return net_g, hps
 
-# Fungsi untuk melakukan inference
 def synthesize_audio(text, net_g, hps, output_path):
     stn_tst = text_to_sequence(text, hps.data.text_cleaners)
     stn_tst = torch.LongTensor(stn_tst).unsqueeze(0).cuda()
@@ -34,22 +32,16 @@ def synthesize_audio(text, net_g, hps, output_path):
             length_scale=1
         )[0][0, 0].data.cpu().float().numpy()
 
-    # Simpan audio ke file .wav
     write(output_path, hps.data.sampling_rate, (audio * 32767).astype(np.int16))
     print(f"Saved synthesized audio to {output_path}")
 
-# Fungsi utama untuk melakukan inference pada seluruh file teks
 def inference_and_save(filelist, checkpoint_path, config_path, output_folder):
-    # Load model dan hyperparameters
     net_g, hps = load_model(checkpoint_path, config_path)
 
-    # Pastikan folder output ada
     os.makedirs(output_folder, exist_ok=True)
 
-    # Load teks dari filelist
     filepaths_and_text = load_filepaths_and_text(filelist)
 
-    # Lakukan inference untuk setiap teks dan simpan hasilnya
     for idx, (filepath, text) in enumerate(filepaths_and_text):
         output_path = os.path.join(output_folder, f"output_{idx + 1}.wav")
         synthesize_audio(text, net_g, hps, output_path)
