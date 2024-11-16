@@ -25,8 +25,8 @@ def evaluate_mcd13(filelist, ref_folder, syn_folder, sr=22050, n_mfcc=13):
     mcd_scores = []
     for entry in filepaths_and_text:
         audio_id = entry[0].split('/')[-1]  
-        ref_audio_path = f"{ref_folder}/{audio_id}.wav"
-        syn_audio_path = f"{syn_folder}/{audio_id}.wav"
+        ref_audio_path = f"{ref_folder}/{audio_id}"
+        syn_audio_path = f"{syn_folder}/{audio_id}"
 
         try:
             mcd_score = calculate_mcd13(ref_audio_path, syn_audio_path, sr=sr, n_mfcc=n_mfcc)
