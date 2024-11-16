@@ -104,6 +104,9 @@ def javanese_cleaners(text):
   Pipeline untuk teks Bahasa Jawa dengan fonemisasi
   menggunakan phonemizer dan aturan khusus.
   """
+  text = convert_to_ascii(text)
+  text = lowercase(text)
+  text = collapse_whitespace(text)
   phonemes = phonemize(text, language='id', backend='espeak', strip=True)
 
   phonemes = re.sub(r'th', 'ʈ', phonemes)  # "th" -> "ʈ"
