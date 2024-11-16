@@ -98,3 +98,15 @@ def english_cleaners2(text):
   phonemes = phonemize(text, language='en-us', backend='espeak', strip=True, preserve_punctuation=True, with_stress=True)
   phonemes = collapse_whitespace(phonemes)
   return phonemes
+
+def javanese_cleaners(text):
+  """
+  Pipeline untuk teks Bahasa Jawa dengan fonemisasi
+  menggunakan phonemizer dan aturan khusus.
+  """
+  phonemes = phonemize(text, language='id', backend='espeak', strip=True)
+
+  phonemes = re.sub(r'th', 'ʈ', phonemes)  # "th" -> "ʈ"
+  phonemes = re.sub(r'dh', 'ɖ', phonemes)  # "dh" -> "ɖ"
+  
+  return phonemes

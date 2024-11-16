@@ -355,8 +355,11 @@ class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
   
           # add extra samples to make it evenly divisible
           rem = num_samples_bucket - len_bucket
-          ids_bucket = ids_bucket + ids_bucket * (rem // len_bucket) + ids_bucket[:(rem % len_bucket)]
-  
+          if len_bucket > 0:
+            ids_bucket = ids_bucket + ids_bucket * (rem // (len_bucket)) + ids_bucket[:(rem % (len_bucket))]
+          else:
+            ids_bucket = ids_bucket * (rem // (1)) + ids_bucket[:(rem % (1))]
+            
           # subsample
           ids_bucket = ids_bucket[self.rank::self.num_replicas]
   
