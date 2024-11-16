@@ -6,11 +6,12 @@ from scipy.io.wavfile import write
 from utils import get_hparams_from_file, load_filepaths_and_text
 from models import SynthesizerTrn
 from text import text_to_sequence
+from text.symbols import symbols
 
 def load_model(checkpoint_path, config_path):
     hps = get_hparams_from_file(config_path)
     net_g = SynthesizerTrn(
-        len(hps.symbols),
+        len(symbols),
         hps.data.filter_length // 2 + 1,
         hps.train.segment_size // hps.data.hop_length,
         **hps.model).cuda()
