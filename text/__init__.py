@@ -16,13 +16,21 @@ def text_to_sequence(text, cleaner_names):
     Returns:
       List of integers corresponding to the symbols in the text
   '''
-  sequence = []
+  def text_to_sequence(text, cleaners):
+    """
+    Convert string to a sequence of symbol IDs. Ignore unrecognized symbols.
+    """
+    sequence = []
+    for symbol in text:
+        try:
+            # Gunakan simbol jika valid
+            symbol_id = _symbol_to_id[symbol]
+            sequence.append(symbol_id)
+        except KeyError:
+            # Abaikan simbol tidak valid
+            print(f"[WARNING] Ignoring unrecognized symbol: {symbol}")
+    return sequence
 
-  clean_text = _clean_text(text, cleaner_names)
-  for symbol in clean_text:
-    symbol_id = _symbol_to_id[symbol]
-    sequence += [symbol_id]
-  return sequence
 
 
 def cleaned_text_to_sequence(cleaned_text):

@@ -40,17 +40,8 @@ def load_model(checkpoint_path, config_path):
     return net_g, hps
 
 def synthesize_audio(text, net_g, hps, output_path):
-    cleaned_sequence = []
-    for symbol in text:
-        try:
-            # Tambahkan simbol jika valid
-            symbol_id = _symbol_to_id[symbol]
-            cleaned_sequence.append(symbol_id)
-        except KeyError:
-            print(f"[WARNING] Ignoring unrecognized symbol: {symbol}")
-
-    # Konversi cleaned_sequence ke tensor
-    stn_tst = torch.LongTensor(cleaned_sequence).unsqueeze(0).cuda()
+    stn_tst = text_to_sequence(text, hps.data.text_cleaners)
+    stn_tst = torch.LongTensor(stn_tst).unsqueeze(0).cuda()
     stn_tst_lengths = torch.LongTensor([stn_tst.size(1)]).cuda()
 
     with torch.no_grad():
