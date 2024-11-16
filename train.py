@@ -51,74 +51,91 @@ def main():
 
 
 def run(rank, n_gpus, hps):
-  global global_step
-  if rank == 0:
-    logger = utils.get_logger(hps.model_dir)
-    logger.info(hps)
-    utils.check_git_hash(hps.model_dir)
-    writer = SummaryWriter(log_dir=hps.model_dir)
-    writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
+    global global_step
 
-  dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
-  torch.manual_seed(hps.train.seed)
-  torch.cuda.set_device(rank)
+    if rank == 0:
+        logger = utils.get_logger(hps.model_dir)
+        logger.info(hps)
+        utils.check_git_hash(hps.model_dir)
+        writer = SummaryWriter(log_dir=hps.model_dir)
+        writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
 
-  train_dataset = TextAudioLoader(hps.data.training_files, hps.data)
-  train_sampler = DistributedBucketSampler(
-      train_dataset,
-      hps.train.batch_size,
-      [32,300,400,500,600,700,800,900,1000],
-      num_replicas=n_gpus,
-      rank=rank,
-      shuffle=True)
-  collate_fn = TextAudioCollate()
-  train_loader = DataLoader(train_dataset, num_workers=8, shuffle=False, pin_memory=True,
-      collate_fn=collate_fn, batch_sampler=train_sampler)
-  if rank == 0:
-    eval_dataset = TextAudioLoader(hps.data.validation_files, hps.data)
-    eval_loader = DataLoader(eval_dataset, num_workers=8, shuffle=False,
-        batch_size=hps.train.batch_size, pin_memory=True,
-        drop_last=False, collate_fn=collate_fn)
+    dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
+    torch.manual_seed(hps.train.seed)
+    torch.cuda.set_device(rank)
 
-  net_g = SynthesizerTrn(
-      len(symbols),
-      hps.data.filter_length // 2 + 1,
-      hps.train.segment_size // hps.data.hop_length,
-      **hps.model).cuda(rank)
-  net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm).cuda(rank)
-  optim_g = torch.optim.AdamW(
-      net_g.parameters(), 
-      hps.train.learning_rate, 
-      betas=hps.train.betas, 
-      eps=hps.train.eps)
-  optim_d = torch.optim.AdamW(
-      net_d.parameters(),
-      hps.train.learning_rate, 
-      betas=hps.train.betas, 
-      eps=hps.train.eps)
-  net_g = DDP(net_g, device_ids=[rank])
-  net_d = DDP(net_d, device_ids=[rank])
+    # Initialize datasets and dataloaders
+    train_dataset = TextAudioLoader(hps.data.training_files, hps.data)
+    train_sampler = DistributedBucketSampler(
+        train_dataset,
+        hps.train.batch_size,
+        [32, 300, 400, 500, 600, 700, 800, 900, 1000],
+        num_replicas=n_gpus,
+        rank=rank,
+        shuffle=True)
+    collate_fn = TextAudioCollate()
+    train_loader = DataLoader(
+        train_dataset,
+        num_workers=8,
+        shuffle=False,
+        pin_memory=True,
+        collate_fn=collate_fn,
+        batch_sampler=train_sampler)
+    
+    if rank == 0:
+        eval_dataset = TextAudioLoader(hps.data.validation_files, hps.data)
+        eval_loader = DataLoader(
+            eval_dataset,
+            num_workers=8,
+            shuffle=False,
+            batch_size=hps.train.batch_size,
+            pin_memory=True,
+            drop_last=False,
+            collate_fn=collate_fn)
 
-  try:
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g)
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d)
-    global_step = (epoch_str - 1) * len(train_loader)
-  except:
-    epoch_str = 1
-    global_step = 0
+    # Initialize models and optimizers
+    net_g = SynthesizerTrn(
+        len(symbols),
+        hps.data.filter_length // 2 + 1,
+        hps.train.segment_size // hps.data.hop_length,
+        **hps.model).cuda(rank)
+    net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm).cuda(rank)
 
-  scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
-  scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
+    optim_g = torch.optim.AdamW(
+        net_g.parameters(),
+        hps.train.learning_rate,
+        betas=hps.train.betas,
+        eps=hps.train.eps)
+    optim_d = torch.optim.AdamW(
+        net_d.parameters(),
+        hps.train.learning_rate,
+        betas=hps.train.betas,
+        eps=hps.train.eps)
+    
+    net_g = DDP(net_g, device_ids=[rank])
+    net_d = DDP(net_d, device_ids=[rank])
 
-  scaler = GradScaler(enabled=hps.train.fp16_run)
-
-  for epoch in range(epoch_str, hps.train.epochs + 1):
-    if rank==0:
-      train_and_evaluate(rank, epoch, hps, [net_g, net_d], [optim_g, optim_d], [scheduler_g, scheduler_d], scaler, [train_loader, eval_loader], logger, [writer, writer_eval])
+    if hps.train.load_pretrained:
+      _, _, _, epoch_str = utils.load_checkpoint(f"{hps.model_dir}/G_0.pth", net_g, optim_g)
+      _, _, _, epoch_str = utils.load_checkpoint(f"{hps.model_dir}/D_0.pth", net_d, optim_d)
     else:
-      train_and_evaluate(rank, epoch, hps, [net_g, net_d], [optim_g, optim_d], [scheduler_g, scheduler_d], scaler, [train_loader, None], None, None)
-    scheduler_g.step()
-    scheduler_d.step()
+      print("No checkpoint or pretrained model found. Starting from scratch.")
+      epoch_str = 1
+      global_step = 0
+
+    # Initialize scheduler and scaler
+    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
+    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
+    scaler = GradScaler(enabled=hps.train.fp16_run)
+
+    # Main training loop
+    for epoch in range(epoch_str, hps.train.epochs + 1):
+        if rank == 0:
+            train_and_evaluate(rank, epoch, hps, [net_g, net_d], [optim_g, optim_d], [scheduler_g, scheduler_d], scaler, [train_loader, eval_loader], logger, [writer, writer_eval])
+        else:
+            train_and_evaluate(rank, epoch, hps, [net_g, net_d], [optim_g, optim_d], [scheduler_g, scheduler_d], scaler, [train_loader, None], None, None)
+        scheduler_g.step()
+        scheduler_d.step()
 
 
 def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers):
