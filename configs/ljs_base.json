@@ -15,7 +15,7 @@
     "warmup_epochs": 0,
     "c_mel": 45,
     "c_kl": 1.0,
-    "load_pretrained": false
+    "load_pretrained": true
   },
   "data": {
     "training_files":"filelists/ljs_audio_text_train_filelist.txt.cleaned",
