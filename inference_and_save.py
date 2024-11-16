@@ -63,8 +63,10 @@ def inference_and_save(filelist, checkpoint_path, config_path, output_folder):
 
     filepaths_and_text = load_filepaths_and_text(filelist)
 
-    for idx, (filepath, text) in enumerate(filepaths_and_text):
-        output_path = os.path.join(output_folder, f"output_{idx + 1}.wav")
+    for filepath, text in filepaths_and_text:
+        filename = os.path.basename(filepath)
+        output_path = os.path.join(output_folder, filename)
+
         synthesize_audio(text, net_g, hps, output_path)
 
 if __name__ == "__main__":
