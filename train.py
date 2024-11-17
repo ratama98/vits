@@ -118,23 +118,37 @@ def run(rank, n_gpus, hps):
     net_g = DDP(net_g, device_ids=[rank])
     net_d = DDP(net_d, device_ids=[rank])
 
-    # Load pretrained model G dan inisialisasi D
-    if hps.train.load_pretrained:
-        print("Loading pretrained G...")
-        _, _, _, epoch_str = utils.load_checkpoint(f"{hps.model_dir}/G_0.pth", net_g, None)
-    else:
-        try:
-            print("Loading latest G checkpoint...")
-            _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g)
-            global_step = (epoch_str - 1) * len(train_loader)
-        except Exception as e:
-            print(f"No checkpoint found for G. Starting from scratch. Error: {e}")
-            epoch_str = 1
-            global_step = 0
+    for param_group in optim_g.param_groups:
+      param_group["initial_lr"] = hps.train.learning_rate
+    for param_group in optim_d.param_groups:
+      param_group["initial_lr"] = hps.train.learning_rate
 
+    epoch_str = 1
+    global_step = 0
+
+    try:
+      print("Loading latest G checkpoint...")
+      _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_0.pth"), net_g, None)
+      global_step = (epoch_str - 1) * len(train_loader)
+    except Exception as e:
+      print(f"No checkpoint found for G. Starting from scratch. Error: {e}")
+      epoch_str = 1
+      global_step = 0
+
+    # Inisialisasi D dari awal
     print("Initializing D from scratch...")
-    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2)
-    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=hps.train.lr_decay, last_epoch=-1)
+
+    # Scheduler untuk G dan D
+    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
+        optim_g, 
+        gamma=hps.train.lr_decay, 
+        last_epoch=epoch_str - 2 if epoch_str > 1 else -1
+    )
+    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(
+        optim_d, 
+        gamma=hps.train.lr_decay, 
+        last_epoch=-1
+    )
 
     scaler = GradScaler(enabled=hps.train.fp16_run)
 
